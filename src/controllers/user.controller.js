@@ -35,7 +35,6 @@ const registerUser = asyncHandler(async (req, res) => {
     // check for user creation
     // return res
     const { fullName, email, username, password } = req.body
-    console.log("email", email);
     if (
         [fullName, email, username, password].some((field) =>
             field?.trim() === "")
@@ -93,62 +92,71 @@ const registerUser = asyncHandler(async (req, res) => {
 })
 
 const loginUser = asyncHandler(async (req, res) => {
-    // req body->data
+    // req body -> data
     // username or email
-    // find user
-    // password check
-    // access and refresh token
-    // send cookie
+    //find the user
+    //password check
+    //access and referesh token
+    //send cookie
 
-    try {
-        const { email, username, password } = req.body
+    const { email, username, password } = req.body
 
-        if (!(username || email)) {
-            throw new ApiError(400, "username or password is required")
-        }
 
-        const user = await User.findOne({
-            $or: [{ username }, { email }]
-        })
-        if (!user) {
-            throw new ApiError(404, "User dose not exist")
-        }
-        const isPasswordValid = await user.isPasswordCorrect(password)
-        if (!isPasswordValid) {
-            throw new ApiError(401, "Invalid user credential")
-        }
+    if (!username && !email) {
+        throw new ApiError(400, "username or email is required")
+    }
 
-        const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id)
+    // Here is an alternative of above code based on logic discussed in video:
+    // if (!(username || email)) {
+    //     throw new ApiError(400, "username or email is required")
 
-        const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+    // }
 
-        const options = {
-            httponly: true,
-            secure: true
-        }
-        return res.
-            status(200)
-            .cookie("accessToken", accessToken, options)
-            .cookie("refreshToken", refreshToken, options)
-            .json(
-                new ApiResponse(
-                    200, {
+    const user = await User.findOne({
+        $or: [{ username }, { email }]
+    })
+
+    if (!user) {
+        throw new ApiError(404, "User does not exist")
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(password)
+
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid user credentials")
+    }
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshToken(user._id)
+
+    const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+
+    const options = {
+        httpOnly: true,
+        secure: true
+    }
+
+    return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new ApiResponse(
+                200,
+                {
                     user: loggedInUser, accessToken, refreshToken
                 },
-                    "User logged In Successfuly"
-                )
+                "User logged In Successfully"
             )
-    } catch (error) {
-        throw new ApiError(404, "user not found")
-    }
+        )
+
 })
 
 const loggoutUser = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(
         req.user._id,
         {
-            $set: {
-                refreshToken: undefined
+            $unset: {
+                refreshToken: 1
             }
         },
         {
@@ -232,9 +240,12 @@ const channngeCurrentPassword = asyncHandler(async (req, res) => {
 })
 
 const getCurrentuser = asyncHandler(async (req, res) => {
+
     return res
         .status(200)
-        .json(200, req.user, "current user fetched successfully")
+        .json(
+            new ApiResponse(200,req.user,"User data successfuly fetched")
+        )
 })
 
 const updatedAccountDetails = asyncHandler(async (req, res) => {
@@ -395,51 +406,51 @@ const getWatchHistory = asyncHandler(async (req, res) => {
             }
         },
         {
-            $lookup:{
-                from:"videos",
-                localField:"watchHistory",
-                foreignField:"_id",
-                as:"watchHistory",
-                pipeline:[
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
                     {
-                        $lookup:{
-                            from:"users",
-                            localField:"owner",
-                            foreignField:"_id",
-                            as:"owner",
-                            pipeline:[
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
                                 {
-                                    $project:{
-                                        fullName:1,
-                                        username:1,
-                                        avatar:1
+                                    $project: {
+                                        fullName: 1,
+                                        username: 1,
+                                        avatar: 1
                                     }
                                 }
                             ]
                         }
                     },
                     {
-                        $addFields:{
-                            owner:{
-                                $first:"$owner"
+                        $addFields: {
+                            owner: {
+                                $first: "$owner"
                             }
                         }
                     }
                 ]
             }
         }
-        
+
     ])
 
     return res
-    .status(200)
-    .json(
-        new ApiResponse(
-            200,
-            user[0].watchHistory,
-            "Watch history fetched successfully"
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                user[0].watchHistory,
+                "Watch history fetched successfully"
+            )
         )
-    )
 })
 export {
     registerUser,
@@ -449,7 +460,6 @@ export {
     channngeCurrentPassword,
     getCurrentuser,
     updatedAccountDetails,
-    updateUserAvatar,
     updateUserAvatar,
     updateUserCoverImage,
     getUserChannelProfile,
